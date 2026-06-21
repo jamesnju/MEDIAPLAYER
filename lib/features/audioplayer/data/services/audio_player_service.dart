@@ -321,9 +321,7 @@ class AudioPlayerService {
         _logger.info('⏭️ No next track available - reached end of queue');
         if (_player.loopMode == LoopMode.all) {
           _logger.info('🔄 Loop all enabled, going to first track');
-          await _player.seek(Duration.zero);
-          _queueIndex = 0;
-          _queueIndexSubject.add(0);
+          await _player.seekToPrevious();
         }
       }
     } catch (e) {
@@ -332,39 +330,42 @@ class AudioPlayerService {
   }
 
   Future<void> previous() async {
-    _logger.info('⏮️ previous() called - Current index: $_queueIndex, Position: ${_player.position.inSeconds}s');
+    _logger.info('⏮️ previous() called - Current index: $_queueIndex, Queue length: ${_queue.length}');
+    
+    // If queue is empty or only has one item, just seek to beginning
+    if (_queue.isEmpty || _queue.length <= 1) {
+      _logger.info('⏮️ Queue has less than 2 items, seeking to beginning');
+      await _player.seek(Duration.zero);
+      return;
+    }
+    
     try {
-      // If we're at the beginning of the track (within first 3 seconds), go to previous track
-      // Otherwise, just seek to beginning of current track
-      if (_player.position.inSeconds < 3 && hasPrevious) {
-        // Go to previous track
-        _logger.info('⏮️ At beginning of track, going to previous track');
-        _queueIndex--;
+      // Use the player's built-in seekToPrevious which works with ConcatenatingAudioSource
+      await _player.seekToPrevious();
+      _logger.info('✅ Previous track playing');
+    } catch (e) {
+      _logger.error('❌ Error playing previous: $e');
+      // Fallback: manual navigation
+      try {
+        int previousIndex = _queueIndex - 1;
+        if (previousIndex < 0) {
+          previousIndex = _queue.length - 1;
+        }
+        _queueIndex = previousIndex;
         _queueIndexSubject.add(_queueIndex);
         
         final media = _queue[_queueIndex];
         _currentMediaId = media.id;
         _currentMediaSubject.add(media);
         
-        // Use seekToPrevious or manually set audio source
-        await _player.seekToPrevious();
-        _logger.info('✅ Previous track playing: ${media.title}');
-      } else if (hasPrevious) {
-        // Go to beginning of current track
-        _logger.info('⏮️ Seeking to beginning of current track');
-        await _player.seek(Duration.zero);
-        _logger.info('✅ Seek to beginning of current track');
-      } else if (_player.position.inSeconds < 3 && !hasPrevious) {
-        // At beginning of first track, just seek to beginning
-        _logger.info('⏮️ At beginning of first track, seeking to start');
-        await _player.seek(Duration.zero);
-      } else {
-        // Not at beginning, just go to beginning of current track
-        _logger.info('⏮️ Seeking to beginning of current track');
-        await _player.seek(Duration.zero);
+        await _player.setAudioSource(
+          AudioSource.file(media.filePath),
+        );
+        await _player.play();
+        _logger.info('✅ Previous track playing (fallback): ${media.title}');
+      } catch (e2) {
+        _logger.error('❌ Fallback also failed: $e2');
       }
-    } catch (e) {
-      _logger.error('❌ Error playing previous: $e');
     }
   }
 
@@ -501,7 +502,6 @@ class AudioPlayerService {
   }
 
   static void reset() {
-    //_logger.info('🔄 reset() called');
     if (_instance != null) {
       _instance!.dispose();
     }
