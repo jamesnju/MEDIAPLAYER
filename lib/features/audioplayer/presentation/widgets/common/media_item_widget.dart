@@ -56,7 +56,7 @@ class MediaItemWidget extends StatelessWidget {
           children: [
             if (showPlayButton)
               IconButton(
-                icon: const Icon(
+                icon:  Icon(
                   Icons.play_arrow,
                   color: AppColors.primary,
                 ),

@@ -118,7 +118,7 @@ class VideoItemWidget extends StatelessWidget {
     return Container(
       height: 120,
       color: AppColors.primary.withOpacity(0.1),
-      child: const Center(
+      child:  Center(
         child: Icon(
           Icons.video_library,
           size: 40,
